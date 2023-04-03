@@ -45,6 +45,18 @@ function Idm-SystemInfo {
                 label = 'Recursive'
                 value = 'true'
             }
+            @{
+                name = 'ignoreACEPermissionErrors'
+                type = 'checkbox'
+                label = 'Ignore ACE Permission Errors'
+                value = 'false'
+            }
+            @{
+                name = 'skipFolderACL'
+                type = 'checkbox'
+                label = 'Skip Folder ACL''s'
+                value = 'false'
+            }
         )
     }
 
@@ -309,6 +321,7 @@ function Idm-ExplicitACEsRead {
         $out = New-Object System.Collections.ArrayList
 
         foreach ($path_spec in $system_params.paths_spec) {
+            Log debug "Path: $($path_spec.path)"
             $gci_args = @{
                 Directory   = $true
                 Force       = $true
@@ -340,10 +353,8 @@ function Idm-ExplicitACEsRead {
                     # For directories, GetAccessControl() returns [System.Security.AccessControl.DirectorySecurity],
                     # which is the same as Get-Acl returns.
                     $sd = $_.GetAccessControl()
-
                     # GetAccessRules() returns [System.Security.AccessControl.FileSystemAccessRule]
                     $acl = $sd.GetAccessRules($true, $false, $system_params.principal_type)    # includeExplicit, !includeInherited
-
                     $ix = 0
 
                     $acl | ForEach-Object {
@@ -363,8 +374,14 @@ function Idm-ExplicitACEsRead {
                 }
             }
             catch {
-                Log error "Failed: $_"
-                Write-Error $_
+                if($system_params.ignoreACEPermissionErrors)
+                {
+                    Log warning "Failed: $_"
+                    Write-Warning $_
+                } else {
+                    Log error "Failed: $_"
+                    Write-Error $_
+                }
             }
         }
 
@@ -477,6 +494,7 @@ function Idm-FoldersRead {
         $access_profiles = GetAccessProfiles $system_params $function_params
 
         foreach ($path_spec in $system_params.paths_spec) {
+            Log debug "Path: $($path_spec.path)"
             $path_with_backslash = AppendBackslashToPath $path_spec.path
 
             $gci_args = @{
@@ -498,7 +516,7 @@ function Idm-FoldersRead {
                 #   "Cannot find drive. A drive with the name 'x' does not exist" instead of
                 #   "A parameter cannot be found that matches parameter name 'Directory'".
                 Get-ChildItem -Force -LiteralPath $path_spec.path >$null
-
+                
                 # For directories, Get-ChildItem returns [System.IO.DirectoryInfo]
                 Get-ChildItem @gci_args | ForEach-Object {
                     foreach ($exclude in $system_params.excludes) {
@@ -509,18 +527,28 @@ function Idm-FoldersRead {
                 } | ForEach-Object {
                     # For directories, GetAccessControl() returns [System.Security.AccessControl.DirectorySecurity],
                     # which is the same as Get-Acl returns.
-                    $sd = $_.GetAccessControl()
+                    if($system_params.skipFolderACL) {
+                        $ht = @{
+                            Attributes        = ($_.Attributes -split ',' | ForEach-Object { $h = $_.Trim(); if ($h.Length -gt 0) { $h.Substring(0,1).Toupper() } }) -join ''
+                            Depth             = $_.FullName.Substring($path_with_backslash.length).Split('\').Count - 1
+                            InheritanceEnable = ''
+                            Owner             = ''
+                            Path              = $_.FullName.Substring(0, $_.FullName.length - $_.Name.Length)
+                        }
+                    } else {
+                        $sd = $_.GetAccessControl()
+                        
+                        $ht = @{
+                            Attributes        = ($_.Attributes -split ',' | ForEach-Object { $h = $_.Trim(); if ($h.Length -gt 0) { $h.Substring(0,1).Toupper() } }) -join ''
+                            Depth             = $_.FullName.Substring($path_with_backslash.length).Split('\').Count - 1
+                            InheritanceEnable = $sd.AreAccessRulesProtected -eq $false
+                            Owner             = $sd.GetOwner($system_params.principal_type).Value
+                            Path              = $_.FullName.Substring(0, $_.FullName.length - $_.Name.Length)
+                        }
 
-                    $ht = @{
-                        Attributes        = ($_.Attributes -split ',' | ForEach-Object { $h = $_.Trim(); if ($h.Length -gt 0) { $h.Substring(0,1).Toupper() } }) -join ''
-                        Depth             = $_.FullName.Substring($path_with_backslash.length).Split('\').Count - 1
-                        InheritanceEnable = $sd.AreAccessRulesProtected -eq $false
-                        Owner             = $sd.GetOwner($system_params.principal_type).Value
-                        Path              = $_.FullName.Substring(0, $_.FullName.length - $_.Name.Length)
+                        $ht += GetIdentityReferencesMatchingAccessProfiles $sd $access_profiles $system_params.principal_type
                     }
-
-                    $ht += GetIdentityReferencesMatchingAccessProfiles $sd $access_profiles $system_params.principal_type
-
+                    
                     $_ | Add-Member -PassThru -Force -NotePropertyMembers $ht
                 } | Select-Object $function_params.properties | Sort-Object { $_.FullName }
             }

@@ -43,19 +43,19 @@ function Idm-SystemInfo {
                 name = 'recursive'
                 type = 'checkbox'
                 label = 'Recursive'
-                value = 'true'
+                value = $true
             }
             @{
                 name = 'ignoreACEPermissionErrors'
                 type = 'checkbox'
                 label = 'Ignore ACE Permission Errors'
-                value = 'false'
+                value = $false
             }
             @{
                 name = 'skipFolderACL'
                 type = 'checkbox'
                 label = 'Skip Folder ACL''s'
-                value = 'false'
+                value = $false
             }
         )
     }
@@ -613,16 +613,9 @@ function Idm-FolderUpdate {
         $full_name = $function_params.FullName
 
         if ($function_params.ContainsKey('Path')) {
-            $p_last_backslash = $function_params.Path.LastIndexOf('\')
-
-            if ($p_last_backslash -gt 2) {
-                # Create intermediate directories
-                New-Item -ItemType Directory -Path ($function_params.Path.Substring(0, $p_last_backslash)) -ErrorAction SilentlyContinue
-            }
-
-            LogIO info "Move-Item" -In -LiteralPath $full_name -Destination $function_params.Path
-                $rv = Move-Item -PassThru -LiteralPath $full_name -Destination $function_params.Path | Select-Object -Property @{ Name = 'FullName'; Expression = {$_.FullName.TrimEnd('\')} }
-            LogIO info "Move-Item" -Out $rv
+            LogIO info "Rename-Item" -In -LiteralPath $function_params.FullName -Destination $function_params.Path
+                $rv = Rename-Item -PassThru -LiteralPath $function_params.FullName -NewName $function_params.Path | Select-Object -Property @{ Name = 'FullName'; Expression = {$_.FullName.TrimEnd('\')} }
+            LogIO info "Rename-Item" -Out $rv
 
             $full_name = $rv.FullName
         }

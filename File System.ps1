@@ -586,9 +586,7 @@ function Idm-FolderUpdate {
             semantics = 'update'
             parameters = @(
                 @{ name = 'FullName';          allowance = 'mandatory' }
-                @{ name = 'InheritanceEnable'; allowance = 'optional'  }
-               #@{ name = 'Owner';             allowance = 'optional'  }
-                @{ name = 'Path';              allowance = 'optional'  }
+                @{ name = 'Name';              allowance = 'mandatory'  }
 
                 foreach ($nr in 1..$Global:NrOfAccessProfiles) {
                     $prefix = "access_profile_$($nr)_"
@@ -612,15 +610,11 @@ function Idm-FolderUpdate {
 
         $full_name = $function_params.FullName
 
-        if ($function_params.ContainsKey('Path')) {
-            LogIO info "Rename-Item" -In -LiteralPath $function_params.FullName -Destination $function_params.Path
-                $rv = Rename-Item -PassThru -LiteralPath $function_params.FullName -NewName $function_params.Path | Select-Object -Property @{ Name = 'FullName'; Expression = {$_.FullName.TrimEnd('\')} }
-            LogIO info "Rename-Item" -Out $rv
+		LogIO info "Rename-Item" -In -LiteralPath $function_params.FullName -Destination $function_params.Name
+			$rv = Rename-Item -PassThru -LiteralPath $function_params.FullName -NewName $function_params.Name | Select-Object -Property @{ Name = 'FullName'; Expression = {$_.FullName.TrimEnd('\')} }
+		LogIO info "Rename-Item" -Out $rv
 
-            $full_name = $rv.FullName
-        }
-
-        ModifyFileSecurityDescriptor $system_params $function_params $full_name
+	    $function_params
     }
 
     Log info "Done"

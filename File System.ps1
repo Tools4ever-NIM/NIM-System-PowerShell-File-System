@@ -45,6 +45,15 @@ function Idm-SystemInfo {
                 label = 'Recursive'
                 value = $true
             }
+			@{
+                name = 'recursion_depth'
+                type = 'textbox'
+                label = 'Recursion Depth'
+                description = 'Max. depth of recursion'
+                value = 1
+				hidden = '!recursive'
+            }
+			
             @{
                 name = 'ignoreACEPermissionErrors'
                 type = 'checkbox'
@@ -327,6 +336,7 @@ function Idm-ExplicitACEsRead {
                 Force       = $true
                 LiteralPath = $path_spec.path
                 Recurse     = $system_params.recursive
+				Depth		= $system_params.recursion_depth
                 ErrorAction = 'SilentlyContinue'
             }
 
@@ -502,6 +512,7 @@ function Idm-FoldersRead {
                 Force       = $true
                 LiteralPath = $path_spec.path
                 Recurse     = $system_params.recursive
+				Depth 		= $system_params.recursion_depth
                 ErrorAction = 'SilentlyContinue'
             }
 

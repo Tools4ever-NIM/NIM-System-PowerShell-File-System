@@ -336,8 +336,12 @@ function Idm-ExplicitACEsRead {
                 Force       = $true
                 LiteralPath = $path_spec.path
                 Recurse     = $system_params.recursive
-				Depth		= $system_params.recursion_depth
+                Depth 	    = 0
                 ErrorAction = 'SilentlyContinue'
+            }
+			
+            if($system_params.recursive) {
+                $gci_args.Depth = $system_params.recursion_depth
             }
 
             if ($path_spec.depth -ge 0) {
@@ -512,8 +516,12 @@ function Idm-FoldersRead {
                 Force       = $true
                 LiteralPath = $path_spec.path
                 Recurse     = $system_params.recursive
-				Depth 		= $system_params.recursion_depth
+                Depth       = 0
                 ErrorAction = 'SilentlyContinue'
+            }
+			
+            if($system_params.recursive) {
+                $gci_args.Depth = $system_params.recursion_depth
             }
 
             if ($path_spec.depth -ge 0) {

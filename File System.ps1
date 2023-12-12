@@ -30,13 +30,15 @@ function Idm-SystemInfo {
             @{
                 name = 'paths_spec'
                 type = 'textbox'
-                label = 'Paths'
+                label = 'P
+		tooltip = "Paths to collect. Separate multiple paths by '|'. Optionally suffix path with ':<n>' to collect 'n' levels deep."
                 value = ''
             }
             @{
                 name = 'excludes'
                 type = 'textbox'
                 label = 'Excludes'
+		tooltip = "File name patterns to exclude. Separate multiple patterns by '|'. E.g. *\example excludes all folders with the name 'example' and their contents; *\example\* excludes the contents of all folders with the name 'example', not the folder itself."
                 value = ''
             }
              @{
@@ -49,9 +51,9 @@ function Idm-SystemInfo {
                 name = 'recursion_depth'
                 type = 'textbox'
                 label = 'Recursion Depth'
-                description = 'Max. depth of recursion'
+                tooltip = 'Max. depth of recursion'
                 value = 1
-				hidden = '!recursive'
+		hidden = '!recursive'
             }
 			
             @{

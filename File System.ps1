@@ -673,8 +673,8 @@ function Idm-FolderDelete {
 
         $function_params = ConvertFrom-Json2 $FunctionParams
 
-        LogIO info "Remove-Item" -In -Force $true -LiteralPath $function_params.FullName
-            $rv = Remove-Item -Force -LiteralPath $function_params.FullName
+        LogIO info "Remove-Item" -In -Recurse $true -Force $true -LiteralPath $function_params.FullName -Confirm:$false
+            $rv = Remove-Item -Recurse -Force -LiteralPath $function_params.FullName -Confirm:$false
         LogIO info "Remove-Item" -Out $rv
 
         $rv

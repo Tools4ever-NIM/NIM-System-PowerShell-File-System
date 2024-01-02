@@ -510,19 +510,17 @@ function Idm-FoldersRead {
         $access_profiles = GetAccessProfiles $system_params $function_params
 
         foreach ($path_spec in $system_params.paths_spec) {
-            Log debug "Path: $($path_spec.path)"
+			Log debug "Path: $($path_spec.path)"
             $path_with_backslash = AppendBackslashToPath $path_spec.path
 
             $gci_args = @{
-                Directory   = $true
-                Force       = $true
-                LiteralPath = $path_spec.path
-                Recurse     = $system_params.recursive
+                Path 		= $path_spec.path
                 Depth       = 0
-                ErrorAction = 'SilentlyContinue'
+				Exclude 	= $system_params.excludes
             }
-			
+
             if($system_params.recursive) {
+				Log debug "Setting depth [$($system_params.recursion_depth)]"
                 $gci_args.Depth = $system_params.recursion_depth
             }
 
@@ -530,27 +528,21 @@ function Idm-FoldersRead {
                 $gci_args.Depth = $path_spec.depth
             }
 
-            LogIO info 'Get-ChildItem' -In @gci_args -Exclude $system_params.excludes -Properties $function_params.properties
+            LogIO info 'GetItemsWithDepth' -In @gci_args -Properties $function_params.properties
 
             try {
-                # This is to correct error messages, e.g.:
-                #   "Cannot find drive. A drive with the name 'x' does not exist" instead of
-                #   "A parameter cannot be found that matches parameter name 'Directory'".
-                Get-ChildItem -Force -LiteralPath $path_spec.path >$null
-                
-                # For directories, Get-ChildItem returns [System.IO.DirectoryInfo]
-                Get-ChildItem @gci_args | ForEach-Object {
+				# For directories, Get-ChildItem returns [System.IO.DirectoryInfo]
+				GetItemsWithDepth @gci_args | ForEach-Object {
                     foreach ($exclude in $system_params.excludes) {
                         if ($_.FullName -ilike $exclude) { return }
                     }
-
                     $_
                 } | ForEach-Object {
-                    # For directories, GetAccessControl() returns [System.Security.AccessControl.DirectorySecurity],
+					# For directories, GetAccessControl() returns [System.Security.AccessControl.DirectorySecurity],
                     # which is the same as Get-Acl returns.
                     if($system_params.skipFolderACL) {
                         $ht = @{
-                            Attributes        = ($_.Attributes -split ',' | ForEach-Object { $h = $_.Trim(); if ($h.Length -gt 0) { $h.Substring(0,1).Toupper() } }) -join ''
+                            Attributes        = ($_.Attributes -split ',' | ForEach-Object { $h = $_; if ($h.Length -gt 0) { $h.Substring(0,1).Toupper() } }) -join ''
                             Depth             = $_.FullName.Substring($path_with_backslash.length).Split('\').Count - 1
                             InheritanceEnable = ''
                             Owner             = ''
@@ -560,7 +552,7 @@ function Idm-FoldersRead {
                         $sd = $_.GetAccessControl()
                         
                         $ht = @{
-                            Attributes        = ($_.Attributes -split ',' | ForEach-Object { $h = $_.Trim(); if ($h.Length -gt 0) { $h.Substring(0,1).Toupper() } }) -join ''
+                            Attributes        = ($_.Attributes -split ',' | ForEach-Object { $h = $_; if ($h.Length -gt 0) { $h.Substring(0,1).Toupper() } }) -join ''
                             Depth             = $_.FullName.Substring($path_with_backslash.length).Split('\').Count - 1
                             InheritanceEnable = $sd.AreAccessRulesProtected -eq $false
                             Owner             = $sd.GetOwner($system_params.principal_type).Value
@@ -697,7 +689,7 @@ function ConvertSystemParams {
 
     $params.paths_spec = @(
         $params.paths_spec.Split('|') | ForEach-Object {
-            $value = $_.Trim()
+            $value = $_
             if ($value.length -eq 0) { return }
 
             $p = $value.LastIndexOf(':')
@@ -720,7 +712,7 @@ function ConvertSystemParams {
 
     $params.excludes = @(
         $params.excludes.Split('|') | ForEach-Object {
-            $value = $_.Trim()
+            $value = $_
             if ($value.length -eq 0) { return }
 
             $value
@@ -986,4 +978,58 @@ function ModifyFileSecurityDescriptor {
 
         $rv
     }
+}
+
+
+
+function GetItemsWithDepth {
+    param (
+        [string]$Path,
+        [int]$Depth,
+        [array]$Excludes
+    )
+
+    # Helper function to recursively list items
+    function InternalGetItems {
+        param (
+            [string]$CurrentPath,
+            [int]$CurrentDepth,
+            [array]$Exclude
+        )
+		
+        if ($CurrentDepth -ge 0) {
+            # Attempt to list the current directory's contents
+            $test = $CurrentPath
+            try {
+                Log debug "Reading $($CurrentPath)"
+                try { $items = Get-ChildItem -LiteralPath $CurrentPath -Directory -Force -ErrorAction Stop | ForEach-Object { 
+                    foreach ($exclude in $Excludes) {
+                        if ($_.FullName -ilike $exclude) { return }
+                    }
+                    $_
+                } } catch { 
+                    $error = "Failed to access contents of: [$($CurrentPath)] - $_"
+                    Log error $error
+					throw $error
+                } 
+
+                # Output the items from the current directory
+                $items
+
+                # If the depth allows, recurse into subdirectories
+                if ($CurrentDepth -gt 0) {
+                    foreach ($item in $items) {
+                        if ($item.PSIsContainer) {
+                            InternalGetItems -CurrentPath $item.FullName -CurrentDepth ($CurrentDepth - 1) -Exclude $Exclude
+                        }
+                    }
+                }
+            } catch {
+                throw $_
+            }
+        }
+    }
+
+    # Start the recursive listing from the initial path and depth
+    InternalGetItems -CurrentPath $Path -CurrentDepth $Depth
 }

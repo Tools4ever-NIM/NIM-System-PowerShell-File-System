@@ -350,6 +350,7 @@ function Idm-FilesRead {
 
             $gci_args = @{
                 Directory   = $false
+				File		= $true
                 Force       = $true
                 LiteralPath = $path_spec.path
                 Recurse     = $system_params.recursive

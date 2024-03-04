@@ -237,6 +237,18 @@ $Properties = @{
         @{ name = 'Owner';             default = $true;             }
         @{ name = 'Path';                                           }
     )
+	File = @(
+        @{ name = 'FullName';          default = $true; key = $true }
+        @{ name = 'Attributes';                                     }
+        @{ name = 'CreationTime';                                   }
+        @{ name = 'Depth';                                          }
+        @{ name = 'LastAccessTime';                                 }
+        @{ name = 'LastWriteTime';                                  }
+        @{ name = 'Name';              default = $true;             }
+        @{ name = 'BaseName';              default = $true;         }
+        @{ name = 'Path';                                           }
+        @{ name = 'B64String';             default = $true;         }
+    )
 }
 
 
@@ -247,6 +259,147 @@ foreach ($key in $Properties.Keys) {
             $Properties.$key[$i].idm = $true
         }
     }
+}
+
+function Idm-FilesRead {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+
+        $system_params = ConvertSystemParams $SystemParams
+
+        $all_properties = $Global:Properties.File
+
+        @(
+            @{
+                name = 'properties'
+                type = 'grid'
+                label = 'Properties'
+                table = @{
+                    rows = @( $all_properties | ForEach-Object {
+                        @{
+                            name = $_.name
+                            usage_hint = @( @(
+                                foreach ($key in $_.Keys) {
+                                    if ($key -eq 'idm') {
+                                        $key.Toupper()
+                                    }
+                                    elseif ($key -ne 'name') {
+                                        $key.Substring(0,1).Toupper() + $key.Substring(1)
+                                    }
+                                }
+                            ) | Sort-Object) -join ' | '
+                        }
+                    })
+                    settings_grid = @{
+                        selection = 'multiple'
+                        key_column = 'name'
+                        checkbox = $true
+                        filter = $true
+                        columns = @(
+                            @{
+                                name = 'name'
+                                display_name = 'Name'
+                            }
+                            @{
+                                name = 'usage_hint'
+                                display_name = 'Usage hint'
+                            }
+                        )
+                    }
+                }
+                value = ($all_properties | Where-Object { $_.default }).name
+            }
+        )
+
+    }
+    else {
+        #
+        # Execute function
+        #
+
+        $system_params   = ConvertSystemParams $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        if ($function_params.properties.length -eq 0) {
+            # No properties selected: select defaults
+
+            $all_properties = $Global:Properties.File
+
+            $function_params.properties = ($all_properties | Where-Object { $_.default }).name
+        }
+
+        # Assure key is the first column
+        $key = ($Global:Properties.File | Where-Object { $_.key }).name
+        $function_params.properties = @($key) + @($function_params.properties | Where-Object { $_ -ne $key })
+
+        foreach ($path_spec in $system_params.paths_spec) {
+            Log debug "Path: $($path_spec.path)"
+            $path_with_backslash = AppendBackslashToPath $path_spec.path
+
+            $gci_args = @{
+                Directory   = $false
+                Force       = $true
+                LiteralPath = $path_spec.path
+                Recurse     = $system_params.recursive
+                Depth       = 0
+                ErrorAction = 'SilentlyContinue'
+            }
+			
+            if($system_params.recursive) {
+                $gci_args.Depth = $system_params.recursion_depth
+            }
+
+            if ($path_spec.depth -ge 0) {
+                $gci_args.Depth = $path_spec.depth
+            }
+
+            LogIO info 'Get-ChildItem' -In @gci_args -Exclude $system_params.excludes -Properties $function_params.properties
+
+            try {
+                # This is to correct error messages, e.g.:
+                #   "Cannot find drive. A drive with the name 'x' does not exist" instead of
+                #   "A parameter cannot be found that matches parameter name 'Directory'".
+                Get-ChildItem -Force -LiteralPath $path_spec.path >$null
+                
+                # For directories, Get-ChildItem returns [System.IO.DirectoryInfo]
+                Get-ChildItem @gci_args | ForEach-Object {
+                    foreach ($exclude in $system_params.excludes) {
+                        if ($_.FullName -ilike $exclude) { return }
+                    }
+
+                    $_
+                } | ForEach-Object {
+                    $ht = @{
+                        Attributes        = ($_.Attributes -split ',' | ForEach-Object { $h = $_.Trim(); if ($h.Length -gt 0) { $h.Substring(0,1).Toupper() } }) -join ''
+                        Depth             = $_.FullName.Substring($path_with_backslash.length).Split('\').Count - 1
+                        Path              = $_.FullName.Substring(0, $_.FullName.length - $_.Name.Length)
+                        B64String         = [System.Convert]::ToBase64String([System.IO.File]::ReadAllBytes($_.FullName))
+                    }
+                
+                    $_ | Add-Member -PassThru -Force -NotePropertyMembers $ht
+                } | Select-Object $function_params.properties | Sort-Object { $_.FullName }
+            }
+            catch {
+                Log error "Failed: $_"
+                Write-Error $_
+            }
+        }
+
+    }
+
+    Log info "Done"
 }
 
 

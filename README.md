@@ -5,6 +5,7 @@
 ## Data Tables
 - Explicit ACEs
 - Folders
+- Files
 
 
 ## Actions

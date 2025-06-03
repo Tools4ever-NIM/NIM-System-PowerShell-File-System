@@ -23,7 +23,7 @@ function Idm-SystemInfo {
         [string] $ConnectionParams
     )
 
-    Log info "-Connection=$Connection -TestConnection=$TestConnection -Configuration=$Configuration -ConnectionParams='$ConnectionParams'"
+    Log verbose "-Connection=$Connection -TestConnection=$TestConnection -Configuration=$Configuration -ConnectionParams='$ConnectionParams'"
     
     if ($Connection) {
         @(
@@ -216,7 +216,7 @@ function Idm-SystemInfo {
         )
     }
 
-    Log info "Done"
+    Log verbose "Done"
 }
 
 
@@ -270,7 +270,7 @@ function Idm-FilesRead {
         [string] $FunctionParams
     )
 
-    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
 
     if ($GetMeta) {
         #
@@ -400,7 +400,7 @@ function Idm-FilesRead {
 
     }
 
-    Log info "Done"
+    Log verbose "Done"
 }
 
 
@@ -413,7 +413,7 @@ function Idm-FolderCreate {
         [string] $FunctionParams
     )
 
-    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
 
     if ($GetMeta) {
         #
@@ -458,7 +458,7 @@ function Idm-FolderCreate {
         $rv
     }
 
-    Log info "Done"
+    Log verbose "Done"
 }
 
 
@@ -471,7 +471,7 @@ function Idm-ExplicitACEsRead {
         [string] $FunctionParams
     )
 
-    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
 
     if ($GetMeta) {
         # Purposely left empty: nothing to configure
@@ -558,7 +558,7 @@ function Idm-ExplicitACEsRead {
         $out | Sort-Object { $_.FullName; $_.Ix }
     }
 
-    Log info "Done"
+    Log verbose "Done"
 }
 
 
@@ -571,7 +571,7 @@ function Idm-FoldersRead {
         [string] $FunctionParams
     )
 
-    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
 
     if ($GetMeta) {
         #
@@ -727,7 +727,7 @@ function Idm-FoldersRead {
 
     }
 
-    Log info "Done"
+    Log verbose "Done"
 }
 
 
@@ -740,7 +740,7 @@ function Idm-FolderUpdate {
         [string] $FunctionParams
     )
 
-    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
 
     if ($GetMeta) {
         #
@@ -784,7 +784,7 @@ function Idm-FolderUpdate {
 	    $function_params
     }
 
-    Log info "Done"
+    Log verbose "Done"
 }
 
 
@@ -797,7 +797,7 @@ function Idm-FolderDelete {
         [string] $FunctionParams
     )
 
-    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
 
     if ($GetMeta) {
         #
@@ -826,7 +826,7 @@ function Idm-FolderDelete {
         $rv
     }
 
-    Log info "Done"
+    Log verbose "Done"
 }
 
 

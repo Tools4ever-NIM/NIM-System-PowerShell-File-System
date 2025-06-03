@@ -1162,9 +1162,9 @@ function GetItemsWithDepth {
                     }
                     $_
                 } } catch { 
-                    $error = "Failed to access contents of: [$($CurrentPath)] - $_"
-                    Log error $error
-					throw $error
+                    $errorMsg = "Failed to access contents of: [$($CurrentPath)] - $($_)"
+                    Log error $errorMsg
+					throw $errorMsg
                 } 
 
                 # Output the items from the current directory

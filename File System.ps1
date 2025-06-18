@@ -1153,19 +1153,41 @@ function GetItemsWithDepth {
 		
         if ($CurrentDepth -ge 0) {
             # Attempt to list the current directory's contents
-            $test = $CurrentPath
             try {
-                Log debug "Reading $($CurrentPath)"
-                try { $items = Get-ChildItem -LiteralPath $CurrentPath -Directory -Force -ErrorAction Stop | ForEach-Object { 
-                    foreach ($exclude in $Excludes) {
-                        if ($_.FullName -ilike $exclude) { return }
-                    }
-                    $_
-                } } catch { 
-                    $errorMsg = "Failed to access contents of: [$($CurrentPath)] - $($_)"
-                    Log error $errorMsg
+                Log verbose "Reading $($CurrentPath)"
+                try {
+					$childItems = Get-ChildItem -LiteralPath $CurrentPath -Directory -Force -ErrorVariable gciErrors -ErrorAction SilentlyContinue
+					
+					$items = @()
+					foreach ($item in $childItems) {
+						$excludeMatch = $false
+						foreach ($exclude in $Excludes) {
+							if ($item.FullName -ilike $exclude) {
+								$excludeMatch = $true
+								break
+							}
+						}
+
+						if (-not $excludeMatch) {
+							$items += $item
+						}
+					}
+
+					if ($gciErrors) {
+						foreach ($err in $gciErrors) {
+							if ($err.Exception -is [System.UnauthorizedAccessException]) {
+								Log warning "Access denied to item in [$CurrentPath]: $($err.Exception.Message)"
+							} else {
+								Log warning "Unexpected error accessing [$CurrentPath]: $($err.Exception.Message)"
+							}
+						}
+					}
+
+				} catch {
+					$errorMsg = "Failed to access contents of: [$CurrentPath] - $($_.Exception.Message)"
+					Log error $errorMsg
 					throw $errorMsg
-                } 
+				} 
 
                 # Output the items from the current directory
                 $items

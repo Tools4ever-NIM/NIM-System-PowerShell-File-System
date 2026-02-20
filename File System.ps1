@@ -5,9 +5,7 @@
 # dot-sourcing the IDM Generic PowerShell Script '../Generic.ps1'.
 #
 
-
-$NrOfAccessProfiles = 3
-
+$NrOfAccessProfiles = 6
 
 #
 # System functions
@@ -28,6 +26,12 @@ function Idm-SystemInfo {
     if ($Connection) {
         @(
             @{
+                    name = 'connection_header'
+                    type = 'text'
+                    text = 'Connection'
+                    tooltip = 'Connection information for the database'
+            }    
+            @{
                 name = 'paths_spec'
                 type = 'textbox'
                 label = 'Paths'
@@ -41,7 +45,26 @@ function Idm-SystemInfo {
                 tooltip = "File name patterns to exclude. Separate multiple patterns by '|'. E.g. *\example excludes all folders with the name 'example' and their contents; *\example\* excludes the contents of all folders with the name 'example', not the folder itself."
                 value = ''
             }
-             @{
+             
+			@{
+                name = 'ExplicitACE_header'
+                type = 'text'
+                text = 'Explicit ACE''s Settings'
+				tooltip = 'Settings for Explicit ACE''s'
+            }
+            @{
+                name = 'ignoreACEPermissionErrors'
+                type = 'checkbox'
+                label = 'Ignore ACE Permission Errors'
+                value = $false
+            }
+            @{
+                name = 'Folders_header'
+                type = 'text'
+                text = 'Folders Settings'
+				tooltip = 'Settings for Folders'
+            }
+            @{
                 name = 'recursive'
                 type = 'checkbox'
                 label = 'Recursive'
@@ -53,19 +76,25 @@ function Idm-SystemInfo {
                 label = 'Recursion Depth'
                 tooltip = 'Max. depth of recursion'
                 value = 1
+                label_indent = $true
                 hidden = '!recursive'
-            }
-			
-            @{
-                name = 'ignoreACEPermissionErrors'
-                type = 'checkbox'
-                label = 'Ignore ACE Permission Errors'
-                value = $false
             }
             @{
                 name = 'skipFolderACL'
                 type = 'checkbox'
-                label = 'Skip Folder ACL''s'
+                label = 'Skip ACL''s'
+                value = $false
+            }
+            @{
+                name = 'shares_header'
+                type = 'text'
+                text = 'Shares Settings'
+				tooltip = 'Settings for Shares'
+            }
+            @{
+                name = 'warningOnlyShares'
+                type = 'checkbox'
+                label = 'Warning only for collection failures'
                 value = $false
             }
         )
@@ -207,18 +236,11 @@ function Idm-SystemInfo {
                     text = ''
                 }
             }
-
-            @{
-                name = 'separator'
-                type = 'text'
-                text = '*** ExplicitACEs TABLE BELOW IS FOR INFORMATIONAL PURPOSES ONLY ***'
-            }
         )
     }
 
     Log verbose "Done"
 }
-
 
 #
 # CRUD functions
@@ -249,8 +271,18 @@ $Properties = @{
         @{ name = 'Path';                                           }
         @{ name = 'B64String';             default = $true;         }
     )
+    Share = @(
+        @{ name = 'Name';          default = $true; key = $true; options = @("create_r","delete_r")     }
+        @{ name = 'Path';          default = $true;  options = @("create_r")               }
+        @{ name = 'Description';   default = $true;  options = @("create_r")               }
+        @{ name = 'PSComputerName';   default = $true;  options = @("create_r","delete_r")               }
+        @{ name = 'FullAccess'; options = @("create_o")                  }
+        @{ name = 'ReadAccess'; options = @("create_o")                  }
+        @{ name = 'ChangeAccess'; options = @("create_o")                  }
+        @{ name = 'NoAccess'; options = @("create_o")                  }
+        
+    )
 }
-
 
 # Default properties and IDM properties are the same
 foreach ($key in $Properties.Keys) {
@@ -403,65 +435,6 @@ function Idm-FilesRead {
     Log verbose "Done"
 }
 
-
-function Idm-FolderCreate {
-    param (
-        # Operations
-        [switch] $GetMeta,
-        # Parameters
-        [string] $SystemParams,
-        [string] $FunctionParams
-    )
-
-    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
-
-    if ($GetMeta) {
-        #
-        # Get meta data
-        #
-
-        $system_params = ConvertSystemParams $SystemParams
-
-        @{
-            semantics = 'create'
-            parameters = @(
-                @{ name = 'FullName';          allowance = 'mandatory' }
-                @{ name = 'InheritanceEnable'; allowance = 'optional'  }
-               #@{ name = 'Owner';             allowance = 'optional'  }
-
-                foreach ($nr in 1..$Global:NrOfAccessProfiles) {
-                    $prefix = "access_profile_$($nr)_"
-
-                    if ($system_params["$($prefix)enable"]) {
-                        @{ name = $system_params["$($prefix)property_name"]; allowance = 'optional' }
-                    }
-                }
-
-                @{ name = '*'; allowance = 'prohibited' }
-            )
-        }
-    }
-    else {
-        #
-        # Execute function
-        #
-
-        $system_params   = ConvertSystemParams $SystemParams
-        $function_params = ConvertFrom-Json2 $FunctionParams
-
-        LogIO info "New-Item" -In -ItemType 'Directory' -Path $function_params.FullName
-            $rv = New-Item -ItemType Directory -Path $function_params.FullName | Select-Object -Property 'FullName'
-        LogIO info "New-Item" -Out $rv
-
-        ModifyFileSecurityDescriptor $system_params $function_params $function_params.FullName | Out-Null
-
-        $rv
-    }
-
-    Log verbose "Done"
-}
-
-
 function Idm-ExplicitACEsRead {
     param (
         # Operations
@@ -560,7 +533,6 @@ function Idm-ExplicitACEsRead {
 
     Log verbose "Done"
 }
-
 
 function Idm-FoldersRead {
     param (
@@ -730,7 +702,6 @@ function Idm-FoldersRead {
     Log verbose "Done"
 }
 
-
 function Idm-FolderUpdate {
     param (
         # Operations
@@ -787,6 +758,62 @@ function Idm-FolderUpdate {
     Log verbose "Done"
 }
 
+function Idm-FolderCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+
+        $system_params = ConvertSystemParams $SystemParams
+
+        @{
+            semantics = 'create'
+            parameters = @(
+                @{ name = 'FullName';          allowance = 'mandatory' }
+                @{ name = 'InheritanceEnable'; allowance = 'optional'  }
+               #@{ name = 'Owner';             allowance = 'optional'  }
+
+                foreach ($nr in 1..$Global:NrOfAccessProfiles) {
+                    $prefix = "access_profile_$($nr)_"
+
+                    if ($system_params["$($prefix)enable"]) {
+                        @{ name = $system_params["$($prefix)property_name"]; allowance = 'optional' }
+                    }
+                }
+
+                @{ name = '*'; allowance = 'prohibited' }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+
+        $system_params   = ConvertSystemParams $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        LogIO info "New-Item" -In -ItemType 'Directory' -Path $function_params.FullName
+            $rv = New-Item -ItemType Directory -Path $function_params.FullName | Select-Object -Property 'FullName'
+        LogIO info "New-Item" -Out $rv
+
+        ModifyFileSecurityDescriptor $system_params $function_params $function_params.FullName | Out-Null
+
+        $rv
+    }
+
+    Log verbose "Done"
+}
 
 function Idm-FolderDelete {
     param (
@@ -829,6 +856,318 @@ function Idm-FolderDelete {
     Log verbose "Done"
 }
 
+function Idm-SharesRead {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+
+        $system_params = ConvertSystemParams $SystemParams
+
+        @(
+            @{
+                name = 'properties'
+                type = 'grid'
+                label = 'Properties'
+                table = @{
+                    rows = @( $all_properties | ForEach-Object {
+                        @{
+                            name = $_.name
+                            usage_hint = @( @(
+                                foreach ($key in $_.Keys) {
+                                    if ($key -eq 'idm') {
+                                        $key.Toupper()
+                                    }
+                                    elseif ($key -ne 'name') {
+                                        $key.Substring(0,1).Toupper() + $key.Substring(1)
+                                    }
+                                }
+                            ) | Sort-Object) -join ' | '
+                        }
+                    })
+                    settings_grid = @{
+                        selection = 'multiple'
+                        key_column = 'name'
+                        checkbox = $true
+                        filter = $true
+                        columns = @(
+                            @{
+                                name = 'name'
+                                display_name = 'Name'
+                            }
+                            @{
+                                name = 'usage_hint'
+                                display_name = 'Usage hint'
+                            }
+                        )
+                    }
+                }
+                value = ($all_properties | Where-Object { $_.default }).name
+            }
+        )
+
+    }
+    else {
+        #
+        # Execute function
+        #
+
+        $system_params   = ConvertSystemParams $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        if ($function_params.properties.length -eq 0) {
+            # No properties selected: select defaults
+
+            $all_properties = $Global:Properties.Share
+
+            $function_params.properties = ($all_properties | Where-Object { $_.default }).name
+        }
+
+        # Assure key is the first column
+        $key = ($Global:Properties.Share | Where-Object { $_.key }).name
+        $properties = @($key) + @($function_params.properties | Where-Object { $_ -ne $key })
+
+        $hash_table = [ordered]@{}
+
+        foreach ($prop in $properties.GetEnumerator()) {
+            $hash_table[$prop] = ""
+        }
+        
+        $hostnames = @();
+        
+        foreach ($path_spec in $system_params.paths_spec) {
+            $cleanPath = $path_spec.path -replace ':\d+$',''
+            # Check if UNC path
+            if ($cleanPath -match '^\\\\([^\\]+)\\') {
+                $hostnames += $matches[1].toLower()
+            }
+
+        }
+
+        foreach ($hostname in ($hostnames | Select-Object -Unique) ) {
+			Log verbose "Gathering shares from $($hostname)"
+           
+            try{
+                try {
+                    $rows = Get-WmiObject -Class Win32_Share -ComputerName $hostname
+                } catch {
+                    if($system_params.warningOnlyShares) {
+                        log warning "Unable to retrieve shares from $($hostname) - $_"
+                        continue
+                    }
+                    throw $_
+                }
+
+                foreach($rowItem in $rows) {
+                    $row = New-Object -TypeName PSObject -Property $hash_table
+                    $row.PSComputerName = $hostname
+                    
+                    foreach($prop in $rowItem.PSObject.properties) {
+                        if(!$properties.contains($prop.Name)) { continue }
+                        $row.($prop.Name) = $prop.Value
+                    }
+
+                    $row
+                }
+            }
+            catch {
+                Log error "Failed: $_"
+                Write-Error $_
+            }
+
+            
+        }
+
+    }
+
+    Log verbose "Done"
+}
+
+function Idm-ShareCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+
+        $system_params = ConvertSystemParams $SystemParams
+
+        @{
+            semantics = 'create'
+            parameters = @(
+                ($Global:Properties.Share | Where-Object { $_.options.Contains('create_r') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.Share | Where-Object { $_.options.Contains('create_o') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                ($Global:Properties.Share | Where-Object { !$_.options.Contains('create_r') -and !$_.options.Contains('create_o') }) | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+
+        $system_params   = ConvertSystemParams $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        # Build Permissions
+        $allAces = @()
+
+        if($function_params.FullAccess.length -gt 0) {        
+            foreach($sid in $function_params.FullAccess.split(',')) {
+                log info "FuLL ACCESS $($sid)"
+                $allAces += New-WmiAce -SidString $sid -AccessMask 2032127
+            }
+        }
+
+        if($function_params.ChangeAccess.length -gt 0) {  
+            foreach($sid in $function_params.ChangeAccess.split(',')) {
+                $allAces += New-WmiAce -SidString $sid -AccessMask 1245631
+            }
+        }
+
+        if($function_params.ReadAccess.length -gt 0) {  
+            foreach($sid in $function_params.ReadAccess.split(',')) {
+                $allAces += New-WmiAce -SidString $sid-AccessMask 1179817
+            }
+        }
+
+        if($function_params.NoAccess.length -gt 0) {  
+            foreach($sid in $function_params.NoAccess.split(',')) {
+                $allAces += New-WmiAce -SidString $sid -AccessMask 2032127 -AceType 1
+            }
+        }
+
+        $securityDescriptor = ([WMIClass]"Win32_SecurityDescriptor").CreateInstance()
+        $securityDescriptor.ControlFlags = 4  # SE_DACL_PRESENT
+        $securityDescriptor.DACL = $allAces
+
+        LogIO info "Win32_Share" -In -Path $function_params.Path -Name $function_params.Name -Description $function_params.Description -PSComputerName $function_params.PSComputerName
+            $share = [WMIClass]"\\$($function_params.PSComputerName)\root\cimv2:Win32_Share"
+            $rv = $share.Create($function_params.Path, $function_params.Name, 0, 100, $function_params.Description,$null,$securityDescriptor)
+
+
+            $statusCode = switch ($rv.ReturnValue) {
+                0  {"Success"}
+                2  {"Access Denied"}
+                8  {"Unknown Failure"}
+                9  {"Invalid Name"}
+                10 {"Invalid Level"}
+                21 {"Invalid Parameter"}
+                22 {"Duplicate Share"}
+                23 {"Redirected Path"}
+                24 {"Unknown Device"}
+                25 {"Net Name Not Found"}
+                default {"Unknown return code: $code"}
+            }
+        LogIO info "Win32_Share" -Out $statusCode
+
+        if($rv.ReturnValue -ne 0) {
+            Log error $statusCode
+            throw $statusCode
+        }
+
+        $function_params
+    }
+
+    Log verbose "Done"
+}
+
+function Idm-ShareDelete {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+
+        $system_params = ConvertSystemParams $SystemParams
+
+        @{
+            semantics = 'delete'
+            parameters = @(
+                ($Global:Properties.Share | Where-Object { $_.options.Contains('delete_r') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.Share | Where-Object { $_.options.Contains('delete_o') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                ($Global:Properties.Share | Where-Object { !$_.options.Contains('delete_r') -and !$_.options.Contains('delete_o') }) | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+
+        $system_params   = ConvertSystemParams $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+
+        LogIO info "Win32_Share" -In -Name $function_params.Name -PSComputerName $function_params.PSComputerName
+            $share = [WMI]"\\$($function_params.PSComputerName)\root\cimv2:Win32_Share.Name='$($function_params.Name)'"
+            $rv = $share.Delete()
+
+            $statusCode = switch ($rv.ReturnValue) {
+                0  {"Success"}
+                2  {"Access Denied"}
+                8  {"Unknown Failure"}
+                9  {"Invalid Name"}
+                21 {"Invalid Parameter"}
+                22 {"Share Not Found"}
+                default {"Unknown return code: $code"}
+            }
+        LogIO info "Win32_Share" -Out $statusCode
+
+        if($rv.ReturnValue -ne 0) {
+            Log error $statusCode
+            throw $statusCode
+        }
+
+        $function_params
+    }
+
+    Log verbose "Done"
+}
 
 #
 # Helper functions
@@ -879,7 +1218,6 @@ function ConvertSystemParams {
     return $params
 }
 
-
 function AppendBackslashToPath {
     param (
         [string] $Path
@@ -897,7 +1235,6 @@ function AppendBackslashToPath {
         $Path + '\'
     }
 }
-
 
 function GetAccessProfiles {
     param (
@@ -930,7 +1267,6 @@ function GetAccessProfiles {
         }
     )
 }
-
 
 function Condense-ACL {
     param (
@@ -991,7 +1327,6 @@ function Condense-ACL {
 
     $condensed_acl
 }
-
 
 function GetIdentityReferencesMatchingAccessProfiles {
     param (
@@ -1060,7 +1395,6 @@ function GetIdentityReferencesMatchingAccessProfiles {
 
     return $ht
 }
-
 
 function ModifyFileSecurityDescriptor {
     param (
@@ -1134,8 +1468,6 @@ function ModifyFileSecurityDescriptor {
     }
 }
 
-
-
 function GetItemsWithDepth {
     param (
         [string]$Path,
@@ -1208,4 +1540,30 @@ function GetItemsWithDepth {
 
     # Start the recursive listing from the initial path and depth
     InternalGetItems -CurrentPath $Path -CurrentDepth $Depth
+}
+
+function New-WmiAce {
+    param(
+        [string]$SidString,
+        [uint32]$AccessMask,
+        [uint32]$AceType = 0
+    )
+
+    # Convert SID string → binary SID
+    $sid = New-Object System.Security.Principal.SecurityIdentifier($SidString)
+    $sidBytes = New-Object byte[] ($sid.BinaryLength)
+    $sid.GetBinaryForm($sidBytes, 0)
+
+    # Trustee
+    $trustee = ([WMIClass]"Win32_Trustee").CreateInstance()
+    $trustee.SID = $sidBytes
+
+    # ACE
+    $ace = ([WMIClass]"Win32_Ace").CreateInstance()
+    $ace.AccessMask = $AccessMask
+    $ace.AceFlags = 3
+    $ace.AceType = $AceType
+    $ace.Trustee = $trustee
+
+    return $ace
 }

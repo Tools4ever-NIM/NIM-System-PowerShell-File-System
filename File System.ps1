@@ -247,6 +247,24 @@ function Idm-SystemInfo {
 #
 
 $Properties = @{
+    DFSNamespace = @(
+        @{ name = 'Path';               default = $true; key = $true }
+        @{ name = 'Description';        default = $true;             }
+        @{ name = 'Type';               default = $true;             }
+        @{ name = 'State';              default = $true;             }
+        @{ name = 'Flags';              default = $true;             }
+        @{ name = 'TimeToLiveSec';      default = $true;             }
+        @{ name = 'TargetPath';                                      }
+    )
+    DFSFolder = @(
+        @{ name = 'Path';               default = $true; key = $true }
+        @{ name = 'Namespace';          default = $true;             }
+        @{ name = 'Description';        default = $true;             }
+        @{ name = 'State';              default = $true;             }
+        @{ name = 'Flags';              default = $true;             }
+        @{ name = 'TimeToLiveSec';      default = $true;             }
+        @{ name = 'TargetPath';                                      }
+    )
     Folder = @(
         @{ name = 'FullName';          default = $true; key = $true }
         @{ name = 'Attributes';                                     }
@@ -291,6 +309,426 @@ foreach ($key in $Properties.Keys) {
             $Properties.$key[$i].idm = $true
         }
     }
+}
+
+function Idm-DFSNamespacesRead {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+
+        $system_params = ConvertSystemParams $SystemParams
+
+        @(
+            @{
+                name = 'properties'
+                type = 'grid'
+                label = 'Properties'
+                table = @{
+                    rows = @( $all_properties | ForEach-Object {
+                        @{
+                            name = $_.name
+                            usage_hint = @( @(
+                                foreach ($key in $_.Keys) {
+                                    if ($key -eq 'idm') {
+                                        $key.Toupper()
+                                    }
+                                    elseif ($key -ne 'name') {
+                                        $key.Substring(0,1).Toupper() + $key.Substring(1)
+                                    }
+                                }
+                            ) | Sort-Object) -join ' | '
+                        }
+                    })
+                    settings_grid = @{
+                        selection = 'multiple'
+                        key_column = 'name'
+                        checkbox = $true
+                        filter = $true
+                        columns = @(
+                            @{
+                                name = 'name'
+                                display_name = 'Name'
+                            }
+                            @{
+                                name = 'usage_hint'
+                                display_name = 'Usage hint'
+                            }
+                        )
+                    }
+                }
+                value = ($all_properties | Where-Object { $_.default }).name
+            }
+        )
+
+    }
+    else {
+        #
+        # Execute function
+        #
+
+        $system_params   = ConvertSystemParams $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        if ($function_params.properties.length -eq 0) {
+            # No properties selected: select defaults
+
+            $all_properties = $Global:Properties.DFSNamespace
+
+            $function_params.properties = ($all_properties | Where-Object { $_.default }).name
+        }
+
+        # Assure key is the first column
+        $key = ($Global:Properties.DFSNamespace | Where-Object { $_.key }).name
+        $properties = @($key) + @($function_params.properties | Where-Object { $_ -ne $key })
+
+        $hash_table = [ordered]@{}
+
+        foreach ($prop in $properties.GetEnumerator()) {
+            $hash_table[$prop] = ""
+        }
+        
+        Log verbose "Gathering DFS Namespaces"
+        
+        try{
+            try {
+                $rows = Get-DfsnRoot
+            } catch {
+                log error "Unable to retrieve DFS Namespaces - $_"
+                throw $_
+            }
+
+            foreach($rowItem in $rows) {
+                $row = New-Object -TypeName PSObject -Property $hash_table
+                
+                foreach($prop in $rowItem.PSObject.properties) {
+                    if(!$properties.contains($prop.Name)) { continue }
+                    $row.($prop.Name) = $prop.Value
+                }
+
+                $row
+            }
+        }
+        catch {
+            Log error "Failed: $_"
+            Write-Error $_
+        }
+
+    }
+
+    Log verbose "Done"
+}
+
+function Idm-DFSFoldersRead {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+
+        $system_params = ConvertSystemParams $SystemParams
+
+        @(
+            @{
+                name = 'properties'
+                type = 'grid'
+                label = 'Properties'
+                table = @{
+                    rows = @( $all_properties | ForEach-Object {
+                        @{
+                            name = $_.name
+                            usage_hint = @( @(
+                                foreach ($key in $_.Keys) {
+                                    if ($key -eq 'idm') {
+                                        $key.Toupper()
+                                    }
+                                    elseif ($key -ne 'name') {
+                                        $key.Substring(0,1).Toupper() + $key.Substring(1)
+                                    }
+                                }
+                            ) | Sort-Object) -join ' | '
+                        }
+                    })
+                    settings_grid = @{
+                        selection = 'multiple'
+                        key_column = 'name'
+                        checkbox = $true
+                        filter = $true
+                        columns = @(
+                            @{
+                                name = 'name'
+                                display_name = 'Name'
+                            }
+                            @{
+                                name = 'usage_hint'
+                                display_name = 'Usage hint'
+                            }
+                        )
+                    }
+                }
+                value = ($all_properties | Where-Object { $_.default }).name
+            }
+        )
+
+    }
+    else {
+        #
+        # Execute function
+        #
+
+        $system_params   = ConvertSystemParams $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        if ($function_params.properties.length -eq 0) {
+            # No properties selected: select defaults
+
+            $all_properties = $Global:Properties.DFSFolder
+
+            $function_params.properties = ($all_properties | Where-Object { $_.default }).name
+        }
+
+        # Assure key is the first column
+        $key = ($Global:Properties.DFSFolder | Where-Object { $_.key }).name
+        $properties = @($key) + @($function_params.properties | Where-Object { $_ -ne $key })
+
+        $hash_table = [ordered]@{}
+
+        foreach ($prop in $properties.GetEnumerator()) {
+            $hash_table[$prop] = ""
+        }
+        
+        Log verbose "Gathering DFS Folders"
+        
+        try{
+            try {
+                $rows = Get-DfsnRoot | ForEach-Object {
+                    $root = $_
+                    Get-DfsnFolder -Path "$($root.Path)\*" | Select-Object @{
+                        Name = 'Namespace'
+                        Expression = { $root.Path }
+                    }, *
+                }
+            } catch {
+                log error "Unable to retrieve DFS Folders - $_"
+                throw $_
+            }
+
+            foreach($rowItem in $rows) {
+                $row = New-Object -TypeName PSObject -Property $hash_table
+                
+                foreach($prop in $rowItem.PSObject.properties) {
+                    if(!$properties.contains($prop.Name)) { continue }
+                    $row.($prop.Name) = $prop.Value
+                }
+
+                $row
+            }
+        }
+        catch {
+            Log error "Failed: $_"
+            Write-Error $_
+        }
+
+    }
+
+    Log verbose "Done"
+}
+
+function Idm-DFSNamespaceCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+
+        @{
+            semantics = 'create'
+            parameters = @(
+                @{ name = 'Path';          allowance = 'mandatory' }
+                @{ name = 'Type';          allowance = 'mandatory'  }
+                @{ name = 'TargetPath';          allowance = 'mandatory'  }
+                @{ name = 'Description';   allowance = 'optional'  }
+                @{ name = '*';             allowance = 'prohibited' }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $new_params = @{ Path = $function_params.Path }
+        if ($function_params.Description) { $new_params['Description'] = $function_params.Description }
+        if ($function_params.Type)        { $new_params['Type']        = $function_params.Type }
+        if ($function_params.TargetPath ) { $new_params['TargetPath'] = $function_params.TargetPath }
+
+        LogIO info "New-DfsnRoot" -In @new_params
+            $rv = New-DfsnRoot @new_params | Select-Object -Property 'Path'
+        LogIO info "New-DfsnRoot" -Out $rv
+
+        $rv
+    }
+
+    Log verbose "Done"
+}
+
+function Idm-DFSNamespaceDelete {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+
+        @{
+            semantics = 'delete'
+            parameters = @(
+                @{ name = 'Path'; allowance = 'mandatory'  }
+                @{ name = '*';    allowance = 'prohibited' }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        LogIO info "Remove-DfsnRoot" -In -Path $function_params.Path
+            $rv = Remove-DfsnRoot -Path $function_params.Path -Confirm:$false -Force
+        LogIO info "Remove-DfsnRoot" -Out $rv
+
+        $rv
+    }
+
+    Log verbose "Done"
+}
+
+function Idm-DFSFolderCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+
+        @{
+            semantics = 'create'
+            parameters = @(
+                @{ name = 'TargetPath';    allowance = 'mandatory' }    
+                @{ name = 'Path';          allowance = 'mandatory' }
+                @{ name = 'Description';   allowance = 'optional'  }
+                @{ name = '*';             allowance = 'prohibited' }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $new_params = @{ Path = $function_params.Path }
+        if ($function_params.Description) { $new_params['Description'] = $function_params.Description }
+        if ($function_params.TargetPath) { $new_params['TargetPath'] = $function_params.TargetPath }
+
+        LogIO info "New-DfsnFolder" -In @new_params
+            $rv = New-DfsnFolder @new_params | Select-Object -Property 'Path'
+        LogIO info "New-DfsnFolder" -Out $rv
+
+        $rv
+    }
+
+    Log verbose "Done"
+}
+
+function Idm-DFSFolderDelete {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log verbose "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+
+        @{
+            semantics = 'delete'
+            parameters = @(
+                @{ name = 'Path'; allowance = 'mandatory'  }
+                @{ name = '*';    allowance = 'prohibited' }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        LogIO info "Remove-DfsnFolder" -In -Path $function_params.Path
+            $rv = Remove-DfsnFolder -Path $function_params.Path -Confirm:$false -Force
+        LogIO info "Remove-DfsnFolder" -Out $rv
+
+        $rv
+    }
+
+    Log verbose "Done"
 }
 
 function Idm-FilesRead {

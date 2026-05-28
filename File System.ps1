@@ -1492,7 +1492,7 @@ function Idm-ShareCreate {
 
         if($function_params.ReadAccess.length -gt 0) {  
             foreach($sid in $function_params.ReadAccess.split(',')) {
-                $allAces += New-WmiAce -SidString $sid-AccessMask 1179817
+                $allAces += New-WmiAce -SidString $sid -AccessMask 1179817
             }
         }
 
@@ -1987,7 +1987,7 @@ function New-WmiAce {
         [uint32]$AceType = 0
     )
 
-    # Convert SID string → binary SID
+    # Convert SID string to binary SID
     $sid = New-Object System.Security.Principal.SecurityIdentifier($SidString)
     $sidBytes = New-Object byte[] ($sid.BinaryLength)
     $sid.GetBinaryForm($sidBytes, 0)
